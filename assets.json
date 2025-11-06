@@ -1,0 +1,44 @@
+{
+  "assets": [
+    {
+      "symbol": "BTC-USD",
+      "name": "Bitcoin",
+      "type": "crypto"
+    },
+    {
+      "symbol": "LINK-USD",
+      "name": "Chainlink",
+      "type": "crypto"
+    },
+    {
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "type": "stock"
+    }
+  ],
+  "settings": {
+    "intervals": [
+      {
+        "interval": "1m",
+        "period": "30d"
+      },
+      {
+        "interval": "5m",
+        "period": "60d"
+      },
+      {
+        "interval": "15m",
+        "period": "60d"
+      },
+      {
+        "interval": "1h",
+        "period": "2y"
+      },
+      {
+        "interval": "1d",
+        "period": "5y"
+      }
+    ],
+    "initial_capital": 10000
+  }
+}
