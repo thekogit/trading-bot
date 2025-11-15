@@ -21,8 +21,7 @@ def safe_print(*args, **kwargs):
     with print_lock:
         print(*args, **kwargs)
 
-class SmartDataCache:
-
+class DataCache:
     def __init__(self, cache_dir='./cache'):
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
@@ -45,7 +44,7 @@ class SmartDataCache:
             try:
                 with open(cache_path, 'rb') as f:
                     data = pickle.load(f)
-                    safe_print(f"   💾 Cache: {symbol} {interval}")
+                    safe_print(f"Cache: {symbol} {interval}")
                     return data
             except:
                 pass
@@ -69,7 +68,7 @@ class SmartDataCache:
         cache_key = f"{symbol}_{period}_{interval}"
         with self.cache_lock:
             if cache_key in self.memory_cache:
-                safe_print(f"   ⚡ Memory: {symbol} {interval}")
+                safe_print(f"Memory: {symbol} {interval}")
                 return self.memory_cache[cache_key].copy()
 
         with self.download_lock:
@@ -82,7 +81,7 @@ class SmartDataCache:
             if elapsed < self.min_request_interval:
                 time.sleep(self.min_request_interval - elapsed)
 
-            safe_print(f"   📥 Download: {symbol} {interval}")
+            safe_print(f"Download: {symbol} {interval}")
 
             try:
                 ticker = yf.Ticker(symbol)
@@ -95,7 +94,7 @@ class SmartDataCache:
                 )
 
                 if df.empty or len(df) < 30:
-                    safe_print(f"   ⚠️  No data: {symbol} {interval}")
+                    safe_print(f"No data: {symbol} {interval}")
                     return None
 
                 df.reset_index(inplace=True)
@@ -113,12 +112,12 @@ class SmartDataCache:
                 self.save_to_disk(symbol, period, interval, result)
 
                 self.last_download_time['last_download'] = time.time()
-                safe_print(f"   ✅ Downloaded: {symbol} {interval} ({len(result)} bars)")
+                safe_print(f"Downloaded: {symbol} {interval} ({len(result)} bars)")
 
                 return result
 
             except Exception as e:
-                safe_print(f"   ❌ Error: {symbol} {interval}: {str(e)[:40]}")
+                safe_print(f"Error: {symbol} {interval}: {str(e)[:40]}")
                 return None
 
     def prefetch(self, assets, intervals_config):
@@ -136,15 +135,19 @@ class SmartDataCache:
             for interval_config in intervals_config:
                 count += 1
                 interval = interval_config['interval']
-                period = interval_config['period']
+                period  = interval_config['period']
 
-                if self.load_from_disk(symbol, period, interval) is not None:
-                    cached += 1
-                    continue
+                prev_ts = self.last_download_time.get('last_download', 0)
 
                 data = self.fetch_with_rate_limit(symbol, period, interval)
-                if data is not None:
-                    downloaded += 1
+                if data is None:
+                    pass
+                else:
+                    new_ts = self.last_download_time.get('last_download', 0)
+                    if new_ts != prev_ts:
+                        downloaded += 1
+                    else:
+                        cached += 1
 
                 if count % 10 == 0:
                     safe_print(f"   Progress: {count}/{total} ({cached} cached, {downloaded} downloaded)")
@@ -152,33 +155,45 @@ class SmartDataCache:
         safe_print(f"\n✅ Pre-fetch complete!")
         safe_print(f"   Total: {total} | Cached: {cached} | Downloaded: {downloaded}\n")
 
-class UltraFastBacktester:
 
-    __slots__ = ['data', 'strategy', 'initial_capital', 'commission', 'slippage',
+class Backtester:
+
+    __slots__ = ['data', 'strategy', 'interval', 'initial_capital', 'commission', 'slippage',
                  'position_size_pct', 'capital', 'position', 'entry_price', 
-                 'trades', 'signals']
+                 'trades', 'signals', 'risk_free_annual']
 
-    def __init__(self, data, strategy, initial_capital=10000, 
-                 commission=0.001, slippage=0.0005, position_size_pct=0.95):
+    def __init__(self, data, strategy, interval='1d', initial_capital=10000, 
+                 commission=0.001, slippage=0.0005, position_size_pct=0.95, risk_free_annual=0.04):
 
         self.data = data
         self.strategy = strategy
+        self.interval = interval
         self.initial_capital = initial_capital
         self.commission = commission
         self.slippage = slippage
         self.position_size_pct = position_size_pct
-
         self.capital = initial_capital
         self.position = 0
         self.entry_price = 0
         self.trades = []
         self.signals = []
+        self.risk_free_annual = risk_free_annual
 
     def run_fast(self):
         try:
-            self.signals = self.strategy.generate_signals(self.data)
-        except:
+            signals = np.nan_to_num(np.asarray(self.strategy.generate_signals(self.data)), nan=0.0)
+            signals = np.sign(signals)
+        except Exception:
             return None
+        
+        signals = np.roll(signals, 1)
+        signals[0] = 0
+
+        warmup = getattr(self.strategy, 'warmup_bars', 0)
+        if warmup > 0:
+            signals[:warmup] = 0
+        
+        self.signals = signals
 
         closes = self.data['close'].values
         n = len(closes)
@@ -196,6 +211,7 @@ class UltraFastBacktester:
                     execution_price = close_price * (1 + self.slippage)
                     cost = shares_to_buy * execution_price * (1 + self.commission)
                     if cost <= self.capital:
+                        self.trades.append({'i': i, 'side': 'buy', 'price': execution_price, 'size': shares_to_buy})
                         self.position = shares_to_buy
                         self.capital -= cost
                         self.entry_price = execution_price
@@ -203,16 +219,43 @@ class UltraFastBacktester:
             elif signal == -1 and self.position > 0:
                 execution_price = close_price * (1 - self.slippage)
                 proceeds = self.position * execution_price * (1 - self.commission)
+                self.trades.append({'i': i, 'side': 'sell', 'price': execution_price, 'size': self.position})
                 self.capital += proceeds
                 self.position = 0
 
         if self.position > 0:
             execution_price = closes[-1] * (1 - self.slippage)
             proceeds = self.position * execution_price * (1 - self.commission)
+            self.trades.append({'i': n-1, 'side': 'sell', 'price': execution_price, 'size': self.position})
             self.capital += proceeds
             self.position = 0
 
         return portfolio_values
+
+    @staticmethod
+    def bars_per_year(interval, market = 'equity'):
+        if market == 'crypto':
+            days_per_year = 365
+            hours_per_day = 24
+            mins_per_day = 24*60
+        else:
+            days_per_year = 252
+            hours_per_day = 6.5
+            mins_per_day = 390
+
+        if interval.endswith('d'):
+            return days_per_year
+
+        elif interval.endswith('h'):
+            hours = int(interval[:-1])
+            return int((hours_per_day / hours) * days_per_year)
+
+        elif interval.endswith('m'):
+            mins = int(interval[:-1])
+            return int((mins_per_day / mins) * days_per_year)
+
+        return days_per_year
+
 
     def calculate_performance_fast(self, portfolio_values):
         if portfolio_values is None or len(portfolio_values) == 0:
@@ -226,10 +269,22 @@ class UltraFastBacktester:
         max_drawdown = np.min(drawdown) if len(drawdown) > 0 else 0
 
         returns = np.diff(portfolio_values) / portfolio_values[:-1]
-        sharpe = (np.mean(returns) / np.std(returns) * np.sqrt(252)) if np.std(returns) > 0 else 0
+        returns = returns[np.isfinite(returns)]
+
+        bpyr = Backtester.bars_per_year(self.interval)
+
+        rf_bar = (1 + self.risk_free_annual)**(1 / bpyr) - 1
+        excess = returns - rf_bar
+        
+        if np.std(excess) > 0:
+            sharpe = np.mean(excess) / np.std(excess) * np.sqrt(bpyr)
+        else:
+            sharpe = 0.0
 
         buy_hold_return = (self.data['close'].iloc[-1] - self.data['close'].iloc[0]) / self.data['close'].iloc[0]
         alpha = total_return - buy_hold_return
+
+        num_trades = sum(1 for t in self.trades if t.get('side') == 'sell')
 
         return {
             'total_return': total_return,
@@ -237,7 +292,7 @@ class UltraFastBacktester:
             'sharpe_ratio': sharpe,
             'max_drawdown': max_drawdown,
             'alpha': alpha,
-            'num_trades': len(self.trades)
+            'num_trades': num_trades
         }
 
 def get_all_strategies():
@@ -266,7 +321,7 @@ def test_combination_cached(args):
         if data is None or len(data) < 30:
             return None
 
-        backtester = UltraFastBacktester(data, strategy)
+        backtester = Backtester(data, strategy, interval=interval)
         portfolio_values = backtester.run_fast()
         metrics = backtester.calculate_performance_fast(portfolio_values)
 
@@ -296,7 +351,7 @@ def test_combination_cached(args):
     except Exception as e:
         return None
 
-def run_smart_cached_backtest(assets_file='assets.json',
+def run_cached_backtest(assets_file='assets.json',
                               test_all_intervals=True,
                               max_workers=None):
 
@@ -313,16 +368,16 @@ def run_smart_cached_backtest(assets_file='assets.json',
         intervals_config = [intervals_config[-1]]
 
     all_strategies = get_all_strategies()
-    cache = SmartDataCache()
+    cache = DataCache()
 
     safe_print("\n" + "="*70)
-    safe_print("💾 SMART CACHED BACKTESTER v3")
+    safe_print("CACHED BACKTESTER v3")
     safe_print("="*70)
-    safe_print(f"📊 Assets: {len(assets)}")
-    safe_print(f"⏱️  Intervals: {len(intervals_config)}")
-    safe_print(f"📋 Strategies: {len(all_strategies)}")
-    safe_print(f"🧵 Threads: {max_workers}")
-    safe_print(f"💾 Cache: ./cache/")
+    safe_print(f"Assets: {len(assets)}")
+    safe_print(f"Intervals: {len(intervals_config)}")
+    safe_print(f"Strategies: {len(all_strategies)}")
+    safe_print(f"Threads: {max_workers}")
+    safe_print(f"Cache: ./cache/")
     safe_print("="*70)
 
     cache.prefetch(assets, intervals_config)
@@ -359,19 +414,19 @@ def run_smart_cached_backtest(assets_file='assets.json',
     elapsed_time = time.time() - start_time
 
     safe_print("\n" + "="*70)
-    safe_print("✅ BACKTEST COMPLETE!")
+    safe_print("BACKTEST COMPLETE!")
     safe_print("="*70)
-    safe_print(f"⏱️  Time: {elapsed_time:.1f}s")
-    safe_print(f"✅ Tests: {len(results)}/{total}")
-    safe_print(f"⚡ Rate: {total/elapsed_time:.1f} tests/sec")
-    safe_print(f"💾 Cache: ./cache/")
+    safe_print(f"Time: {elapsed_time:.1f}s")
+    safe_print(f"Tests: {len(results)}/{total}")
+    safe_print(f"Rate: {total/elapsed_time:.1f} tests/sec")
+    safe_print(f"Cache: ./cache/")
     safe_print("="*70)
 
     return results
 
 if __name__ == "__main__":
 
-    results = run_smart_cached_backtest(
+    results = run_cached_backtest(
         assets_file='assets.json',
         test_all_intervals=True,
         max_workers=None
@@ -379,4 +434,4 @@ if __name__ == "__main__":
     if results:
         report_gen = ReportGenerator(output_dir='./reports')
         report_gen.generate(results, output_file='backtest_report')
-        print("\n🎉 DONE!")
+        print("\n DONE!")

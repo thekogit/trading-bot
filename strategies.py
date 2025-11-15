@@ -335,6 +335,7 @@ class SentimentStrategy:
                     signals[i] = -1
 
         return signals
+    
 class BollingerBandsStrategy:
     def __init__(self, window=20, num_std=2):
         self.window = window
