@@ -6,20 +6,124 @@
       "type": "crypto"
     },
     {
+      "symbol": "ETH-USD",
+      "name": "Ethereum",
+      "type": "crypto"
+    },
+    {
+      "symbol": "SOL-USD",
+      "name": "Solana",
+      "type": "crypto"
+    },
+    {
+      "symbol": "XRP-USD",
+      "name": "Ripple",
+      "type": "crypto"
+    },
+    {
+      "symbol": "BNB-USD",
+      "name": "Binance Coin",
+      "type": "crypto"
+    },
+    {
+      "symbol": "ADA-USD",
+      "name": "Cardano",
+      "type": "crypto"
+    },
+    {
+      "symbol": "DOGE-USD",
+      "name": "Dogecoin",
+      "type": "crypto"
+    },
+    {
       "symbol": "LINK-USD",
       "name": "Chainlink",
       "type": "crypto"
     },
     {
+      "symbol": "DOT-USD",
+      "name": "Polkadot",
+      "type": "crypto"
+    },
+    {
+      "symbol": "ATOM-USD",
+      "name": "Cosmos",
+      "type": "crypto"
+    },
+    {
+      "symbol": "NEAR-USD",
+      "name": "NEAR Protocol",
+      "type": "crypto"
+    },
+    {
+      "symbol": "FET-USD",
+      "name": "Fetch.ai",
+      "type": "crypto"
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla Inc.",
+      "type": "stock"
+    },
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA Corp.",
+      "type": "stock"
+    },
+    {
       "symbol": "AAPL",
       "name": "Apple Inc.",
       "type": "stock"
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft Corp.",
+      "type": "stock"
+    },
+    {
+      "symbol": "GOOGL",
+      "name": "Alphabet Inc.",
+      "type": "stock"
+    },
+    {
+      "symbol": "AMZN",
+      "name": "Amazon.com Inc.",
+      "type": "stock"
+    },
+    {
+      "symbol": "META",
+      "name": "Meta Platforms Inc.",
+      "type": "stock"
+    },
+    {
+      "symbol": "AMC",
+      "name": "AMC Entertainment",
+      "type": "stock"
+    },
+    {
+      "symbol": "PLTR",
+      "name": "Palantir Technologies",
+      "type": "stock"
+    },
+    {
+      "symbol": "SPY",
+      "name": "S&P 500 ETF",
+      "type": "index"
+    },
+    {
+      "symbol": "QQQ",
+      "name": "Nasdaq-100 ETF",
+      "type": "index"
     }
   ],
   "settings": {
     "intervals": [
       {
         "interval": "1m",
+        "period": "7d"
+      },
+      {
+        "interval": "2m",
         "period": "30d"
       },
       {
@@ -31,12 +135,16 @@
         "period": "60d"
       },
       {
+        "interval": "30m",
+        "period": "60d"
+      },
+      {
         "interval": "1h",
-        "period": "2y"
+        "period": "300d"
       },
       {
         "interval": "1d",
-        "period": "5y"
+        "period": "10y"
       }
     ],
     "initial_capital": 10000

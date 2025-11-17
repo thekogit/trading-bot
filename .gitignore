@@ -19,36 +19,36 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Virtual Environment
+cache/
+cache/*
+*.pkl
+reports/        # All generated reports
+reports/*       # Everything inside reports/
+*.html          # HTML reports
+*.csv           # CSV exports
 venv/
 env/
 ENV/
 .venv
 
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
 .DS_Store
 Thumbs.db
 
-# Project specific
 *.log
 *.csv
 *.db
 *.sqlite
 
-# Environment variables
 .env
 config.json
 secrets.json
 
-# Data files (if you save backtesting results)
 data/
 results/
 backtest_results/
